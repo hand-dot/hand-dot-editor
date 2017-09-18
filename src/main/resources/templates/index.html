@@ -2,42 +2,155 @@
 <html xmlns:th="http://thymeleaf.org">
 
 <head>
-    <title>WhiteBoad</title>
+    <title>Shere Editor</title>
     <script src="webjars/sockjs-client/1.0.2/sockjs.js"></script>
     <script src="webjars/stomp-websocket/2.3.3/stomp.js"></script>
-    <script src="webjars/jquery/2.1.4/dist/jquery.js"></script>
     <script src="webjars/lodash/4.17.4/lodash.js"></script>
+    <script src="webjars/jquery/2.1.4/dist/jquery.js"></script>
+    <script src="webjars/bootstrap/3.3.7/js/bootstrap.min.js"></script>
     <script src="webjars/monaco-editor/0.10.0/min/vs/loader.js"></script>
-    <script src="../static/js/jquery.jrumble.1.3.min.js" th:src="@{/js/jquery.jrumble.1.3.min.js}"></script>
-    <script src="../static/js/ws.js" th:src="@{/js/ws.js}"></script>
-    <!-- <script src="../static/js/dom.js" th:src="@{/js/dom.js}"></script> -->
-    <link rel="stylesheet" href="webjars/bootstrap/3.1.0/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="../static/css/style.css" th:href="@{/css/style.css}" />
+    <link rel="stylesheet" href="webjars/bootstrap/3.3.7/css/bootstrap.min.css" />
 </head>
+<style type="text/css">
+html,
+body,
+#editor {
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+</style>
 
 <body onload="connect();">
-    <div id="container" style="width:800px;height:600px;border:1px solid grey"></div>
-    <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
+    <span id="ip" style="display: none" th:text="${ip}">ip</span>
+    <div class="container">
+        <div style="margin-top: 5px;" class="row">
+            <div class="col-md-3">
+                <h4>Shere Editor!!</h4>
+            </div>
+            <div class="col-md-3">
+                <div class="input-group input-group-md">
+                    <input type="text" class="form-control" placeholder="url"></input>
+                    <span class="input-group-addon"><span class="glyphicon glyphicon-copy"></span></span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label style="margin-top: 5px;" class="col-sm-4 control-label">Language</label>
+                    <div class="col-sm-8">
+                        <select class="form-control">
+                            <option>bat</option>
+                            <option>c</option>
+                            <option>coffeescript</option>
+                            <option>cpp</option>
+                            <option>csharp</option>
+                            <option>css</option>
+                            <option>dockerfile</option>
+                            <option>fsharp</option>
+                            <option>go</option>
+                            <option>handlebars</option>
+                            <option>html</option>
+                            <option>ini</option>
+                            <option>java</option>
+                            <option>javascript</option>
+                            <option>json</option>
+                            <option>less</option>
+                            <option>lua</option>
+                            <option>markdown</option>
+                            <option>msdax</option>
+                            <option>objective-c</option>
+                            <option>php</option>
+                            <option>plaintext</option>
+                            <option>postiats</option>
+                            <option>powershell</option>
+                            <option>pug</option>
+                            <option>python</option>
+                            <option>r</option>
+                            <option>razor</option>
+                            <option>ruby</option>
+                            <option>sb</option>
+                            <option>scss</option>
+                            <option>sol</option>
+                            <option>sql</option>
+                            <option>swift</option>
+                            <option>typescript</option>
+                            <option>vb</option>
+                            <option>xml</option>
+                            <option>yaml</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="form-group">
+                    <label style="margin-top: 5px;" class="col-sm-3 control-label">Theme</label>
+                    <div class="col-sm-9">
+                        <select class="form-control">
+                            <option>Visual Studio</option>
+                            <option>Visual Studio Dark</option>
+                            <option>High Contrast Dark</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="editor"></div>
     <script>
-    require.config({ paths: { 'vs': 'webjars/monaco-editor/0.10.0/min/vs' } });
-    require(['vs/editor/editor.main'], function() {
-        var editor = monaco.editor.create(document.getElementById('container'), {
-            value: [
-                'function x() {',
-                '\tconsole.log("Hello world!");',
-                '}'
-            ].join('\n'),
-            language: 'javascript'
+    var stomp = null;
+    var editor = null;
+    var lockFlg = false;
+
+    function connect() {
+        //IPアドレス書き換え処理
+        if (location.href === 'http://localhost:8989/') {
+            location.href = 'http://' + document.getElementById('ip').textContent + ':8989/';
+        }
+
+        // Websocket初期化処理
+        var socket = new SockJS('/ws');
+        stomp = Stomp.over(socket);
+        stomp.connect({}, function(frame) {
+            //エディター初期化処理
+            require.config({ paths: { 'vs': 'webjars/monaco-editor/0.10.0/min/vs' } });
+            require(['vs/editor/editor.main'], function() {
+                editor = monaco.editor.create(document.getElementById('editor'), {
+                    language: 'javascript',
+                    lineNumbers: true,
+                    scrollBeyondLastLine: false,
+                    readOnly: false,
+                    automaticLayout: true,
+                    theme: 'vs-dark'
+                });
+
+                // 初期値をサーバーからもらう
+                stomp.send('/app/ws/get');
+
+                // エディターに変更があった時に呼ばれる処理
+                editor.onDidChangeModelContent(function(event) {
+                    //サーバーに今のエディターの文字を送る
+                    lockFlg = true;
+                    stomp.send('/app/ws/set', {}, editor.getValue() || ' ');
+                });
+            });
+            // 受信した時の処理
+            stomp.subscribe('/topic/ws', function(res) {
+                //送られたデータがエディターの文字と同じじゃなかったら更新する
+                if (!lockFlg) {
+                    if (res.body !== editor.getValue()) {
+                        editor.setValue(res.body);
+                    }
+                } else {
+                    lockFlg = false;
+                }
+            });
         });
-    });
+    };
     </script>
 </body>
-<span id="ip" style="display: none" th:text="${ip}">ip</span>
-<script>
-var ip = document.getElementById("ip").textContent;
-if (location.href == "http://localhost:8989/") {
-    location.href = "http://" + ip + ":8989/";
-}
-</script>
 
 </html>
