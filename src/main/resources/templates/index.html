@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://thymeleaf.org">
+
+<head>
+    <title>WhiteBoad</title>
+    <script src="webjars/sockjs-client/1.0.2/sockjs.js"></script>
+    <script src="webjars/stomp-websocket/2.3.3/stomp.js"></script>
+    <script src="webjars/jquery/2.1.4/dist/jquery.js"></script>
+    <script src="webjars/lodash/4.17.4/lodash.js"></script>
+    <script src="webjars/monaco-editor/0.10.0/min/vs/loader.js"></script>
+    <script src="../static/js/jquery.jrumble.1.3.min.js" th:src="@{/js/jquery.jrumble.1.3.min.js}"></script>
+    <script src="../static/js/ws.js" th:src="@{/js/ws.js}"></script>
+    <!-- <script src="../static/js/dom.js" th:src="@{/js/dom.js}"></script> -->
+    <link rel="stylesheet" href="webjars/bootstrap/3.1.0/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="../static/css/style.css" th:href="@{/css/style.css}" />
+</head>
+
+<body onload="connect();">
+    <div id="container" style="width:800px;height:600px;border:1px solid grey"></div>
+    <script src="node_modules/monaco-editor/min/vs/loader.js"></script>
+    <script>
+    require.config({ paths: { 'vs': 'webjars/monaco-editor/0.10.0/min/vs' } });
+    require(['vs/editor/editor.main'], function() {
+        var editor = monaco.editor.create(document.getElementById('container'), {
+            value: [
+                'function x() {',
+                '\tconsole.log("Hello world!");',
+                '}'
+            ].join('\n'),
+            language: 'javascript'
+        });
+    });
+    </script>
+</body>
+<span id="ip" style="display: none" th:text="${ip}">ip</span>
+<script>
+var ip = document.getElementById("ip").textContent;
+if (location.href == "http://localhost:8989/") {
+    location.href = "http://" + ip + ":8989/";
+}
+</script>
+
+</html>
